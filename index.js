@@ -15,11 +15,11 @@ app.listen(PORT, () => {
 
 // Manejo y llamado de rutas
 app.use('/login', require('./rutas/login'));
-app.use('/register', require('./rutas/register'));
 
 app.use('/proyectos', require('./rutas/proyectos'));
 app.use('/imagenes', require('./rutas/imagenes'));
-//app.use('/asesorias', require('./rutas/asesorias'));
+app.use('/asesorias', require('./rutas/asesorias'));
+app.use('/usuarios', require('./rutas/usuarios'));
 
 // Exportar app para pruebas
 module.exports = app;
