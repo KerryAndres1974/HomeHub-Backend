@@ -13,10 +13,11 @@ router.get('/:idproyecto', async (req, res) => {
     const idproyecto = req.params.idproyecto;
 
     try {
-        const query = 'SELECT id, imagen FROM imagenes WHERE idproyecto = $1';
+        const query = 'SELECT id, imagen_url FROM imagen WHERE idproyecto = $1';
         const imagenes = await pool.query(query, [idproyecto]);
 
         res.json(imagenes.rows);
+        
     } catch (err) {
         console.error(err);
         res.status(500).json({ err: 'Error al obtener imagenes' });
@@ -28,7 +29,7 @@ router.delete('/:idimagen', async (req, res) => {
     const idimagen = req.params.idimagen;
 
     try {
-        const queryE = 'SELECT imagen FROM imagenes WHERE id = $1';
+        const queryE = 'SELECT imagen_url FROM imagen WHERE id = $1';
         const imagen = await pool.query(queryE, [idimagen]);
 
         if (imagen.rowCount === 0) {
@@ -43,7 +44,7 @@ router.delete('/:idimagen', async (req, res) => {
 
         await cloudinary.uploader.destroy(public_id);
 
-        const queryD = 'DELETE FROM imagenes WHERE id = $1';
+        const queryD = 'DELETE FROM imagen WHERE id = $1';
         await pool.query(queryD, [idimagen]);
 
         res.json({ message: 'Imagen eliminada' });

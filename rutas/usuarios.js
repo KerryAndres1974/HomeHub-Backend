@@ -8,7 +8,7 @@ router.post('/', async (req, res) => {
     const { user, name, password, email, phone } = req.body;
 
     try {
-        const queryEmail = 'SELECT * FROM users WHERE email = $1';
+        const queryEmail = 'SELECT * FROM usuario WHERE email = $1';
         const existeEmail = await pool.query(queryEmail, [email]);
 
         if (existeEmail.rows.length > 0) {
@@ -18,7 +18,7 @@ router.post('/', async (req, res) => {
         // Hashea la contraseña antes de almacenarla en la base de datos
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const query = `INSERT INTO users (username, name, password, email, phone)
+        const query = `INSERT INTO usuario (username, name, password, email, phone)
                         VALUES ($1, $2, $3, $4, $5) RETURNING *`;
 
         const usuario = await pool.query(query, [user, name, hashedPassword, email, phone]);
@@ -37,7 +37,7 @@ router.get('/:idusuario', async (req, res) => {
     const idusuario = req.params.idusuario;
 
     try {
-        const query = 'SELECT * FROM users WHERE id = $1';
+        const query = 'SELECT * FROM usuario WHERE id = $1';
         const usuario = await pool.query(query, [idusuario]);
 
         if (usuario.rowCount === 0) {
@@ -59,7 +59,7 @@ router.put('/:idusuario', async (req, res) => {
 
     try {
         // Verificar si el proyecto existe antes de realizar la actualización
-        const query1 = 'SELECT * FROM users WHERE id = $1';
+        const query1 = 'SELECT * FROM usuario WHERE id = $1';
         const existingUser = await pool.query(query1, [idusuario]);
 
         if (existingUser.rows.length === 0) {
@@ -84,7 +84,7 @@ router.put('/:idusuario', async (req, res) => {
             fotoperfil = existingUser.rows[0].fotoperfil;
         }
 
-        const query2 = `UPDATE users SET 
+        const query2 = `UPDATE usuario SET 
         name = $1, password = $2, email = $3, phone = $4, fotoperfil = $5 WHERE id = $6`;
 
         const result = await pool.query(query2, [name, password, email, phone, fotoperfil, idusuario]);

@@ -17,7 +17,7 @@ router.post('/', async (req, res) => {
         const idproyecto = result.rows[0].id;
         
         if (imagenes && imagenes.length > 0){
-            const queryImg = `INSERT INTO imagenes (idproyecto, imagen) VALUES ($1, $2)`;
+            const queryImg = `INSERT INTO imagen (idproyecto, imagen_url) VALUES ($1, $2)`;
             for(const image of imagenes) {
                 await pool.query(queryImg, [idproyecto, image]);
             }
@@ -35,8 +35,8 @@ router.post('/', async (req, res) => {
 router.get('/', async (req, res) => {
 
     try {
-        const query = `SELECT p.* , (SELECT i.imagen
-                FROM imagenes i WHERE i.idproyecto = p.id
+        const query = `SELECT p.* , (SELECT i.imagen_url
+                FROM imagen i WHERE i.idproyecto = p.id
                 ORDER BY i.id ASC LIMIT 1) AS imagen
                 FROM proyecto p WHERE p.estado = 'activo'`;
 
@@ -56,8 +56,8 @@ router.get('/usuario/:idusuario', async (req, res) => {
     const idusuario = req.params.idusuario;
 
     try {
-        const query = `SELECT p.* , (SELECT i.imagen
-                FROM imagenes i WHERE i.idproyecto = p.id
+        const query = `SELECT p.* , (SELECT i.imagen_url
+                FROM imagen i WHERE i.idproyecto = p.id
                 ORDER BY i.id ASC LIMIT 1) AS imagen
                 FROM proyecto p WHERE p.idusuario = $1 AND p.estado = 'activo'`;
         const proyecto = await pool.query(query, [idusuario]);
@@ -113,7 +113,7 @@ router.put('/:idproyecto', async (req, res) => {
 
         if (imagenes && imagenes.length > 0){
             for(const imagen of imagenes) {
-                const queryImg = `INSERT INTO imagenes (idproyecto, imagen) VALUES ($1, $2)`;
+                const queryImg = `INSERT INTO imagen (idproyecto, imagen_url) VALUES ($1, $2)`;
                 await pool.query(queryImg, [idproyecto, imagen]);
             }
         }
