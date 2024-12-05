@@ -23,7 +23,7 @@ router.post('/', async (req, res) => {
 
         const usuario = await pool.query(query, [user, name, hashedPassword, email, phone]);
 
-        res.status(201).json(usuario.rows[0]);
+        res.json(usuario.rows[0]);
 
     } catch (err) {
         console.error('Error al agregar al nuevo empleado:', err);
@@ -31,6 +31,45 @@ router.post('/', async (req, res) => {
     }
 
 });
+
+// Obtener todos los usuarios
+router.get('/', async (req, res) => {
+
+    try {
+        const query = `SELECT u.*,
+             COUNT(CASE WHEN p.estado = 'activo' THEN 1 END) AS proyectos_activos,
+             COUNT(CASE WHEN p.estado = 'vendido' THEN 1 END) AS proyectos_vendidos,
+             COUNT(CASE WHEN p.estado = 'inactivo' THEN 1 END) AS proyectos_inactivos
+            FROM usuario u
+            LEFT JOIN proyecto p
+            ON u.id = p.idusuario
+            GROUP BY u.id`;
+
+        const usuarios = await pool.query(query);
+        res.json(usuarios.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al obtener los usuarios' });
+    }
+})
+
+// Obtener propiedades de usuario
+router.get('/propiedades/:estado/:idusuario', async (req, res) => {
+    const estado = req.params.estado;
+    const idusuario = req.params.idusuario;
+
+    try {
+        const query = `SELECT p.*, (SELECT i.imagen_url
+                FROM imagen i WHERE i.idproyecto = p.id
+                ORDER BY i.id ASC LIMIT 1) AS imagen 
+                FROM proyecto p WHERE idusuario = $1 AND estado = $2`;
+        const proyecto = await pool.query(query, [idusuario, estado]);
+        res.json(proyecto.rows);
+    } catch (err){
+        console.log(err);
+        res.status(500).json({ error: 'Error al obtener los proyectos' });
+    }
+})
 
 // Obtener usuario
 router.get('/:idusuario', async (req, res) => {
@@ -55,45 +94,36 @@ router.get('/:idusuario', async (req, res) => {
 // Editar usuario
 router.put('/:idusuario', async (req, res) => {
     const idusuario = req.params.idusuario;
-    let { name, password, email, phone, fotoperfil } = req.body;
-
+    const update = { ...req.body };
+    
     try {
-        // Verificar si el proyecto existe antes de realizar la actualización
-        const query1 = 'SELECT * FROM usuario WHERE id = $1';
-        const existingUser = await pool.query(query1, [idusuario]);
+        const campos = Object.keys(update);
+        const valores = [];
+        
+        if (campos.length === 0) {
+            return res.status(404).json({ message: 'Actualización sin cambios' });
+        }
+        
+        if (update.password) {
+            const hashed = await bcrypt.hash(update.password, 10);
+            update.password = hashed;
+        }
 
-        if (existingUser.rows.length === 0) {
+        const clausula = campos.map((campo, i) => `${campo} = $${i + 1}`).join(', ');
+        valores.push(...Object.values(update), idusuario);
+
+        const query = `UPDATE usuario SET ${clausula} WHERE id = $${valores.length}`;
+        const usuario = await pool.query(query, valores);
+        
+        if (usuario.rowCount === 0) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
-
-        if (name === '') {
-            name = existingUser.rows[0].name;
-        }
-        if (password) {
-            password = await bcrypt.hash(password, 10);
-        } else if (password === '') {
-            password = existingUser.rows[0].password;
-        }
-        if (email === '') {
-            email = existingUser.rows[0].email;
-        }
-        if (phone === '') {
-            phone = existingUser.rows[0].phone;
-        }
-        if (fotoperfil === '') {
-            fotoperfil = existingUser.rows[0].fotoperfil;
-        }
-
-        const query2 = `UPDATE usuario SET 
-        name = $1, password = $2, email = $3, phone = $4, fotoperfil = $5 WHERE id = $6`;
-
-        const result = await pool.query(query2, [name, password, email, phone, fotoperfil, idusuario]);
-
-        res.status(201).json({ message: 'Usuario actualizado con exito', users: result.rows[0] });
+        
+        res.json(usuario.rows);
 
     } catch(error) {
         console.log(error);
-        res.status(500).json({ error: 'Error al editar el perfil' });
+        res.status(500).json({ error: 'Error al editar el usuario' });
     }
 });
 
