@@ -97,19 +97,30 @@ router.get('/proyecto/:idproyecto', async (req, res) => {
 // Editar proyecto
 router.put('/:idproyecto', async (req, res) => {
 
-    const id = req.params.idproyecto;
-    let { descripcion, ciudad, tipo, precio, nombre, direccion, estado, imagenes } = req.body;
+    const idproyecto = req.params.idproyecto;
+    const update = req.body;
 
     try {
-        // Verificar si el proyecto existe antes de realizar la actualización
-        const query1 = 'SELECT * FROM proyecto WHERE id = $1';
-        const existingProject = await pool.query(query1, [id]);
+        const imagenes = update.imagenes;
+        delete update.imagenes;
 
-        if (existingProject.rows.length === 0) {
-            return res.status(404).json({ message: 'Proyecto no encontrado' });
+        const campos = Object.keys(update);
+        const valores = Object.values(update);
+
+        if (campos.length === 0) {
+            return res.status(404).json({ message: 'Actualización sin cambios' });
         }
 
-        const idproyecto = existingProject.rows[0].id;
+        const clausula = campos.map((campo, i) => `${campo} = $${i + 1}`).join(', ');
+        valores.push(idproyecto);
+ 
+        // Verificar si el proyecto existe antes de realizar la actualización
+        const query = `UPDATE proyecto SET ${clausula} WHERE id = $${valores.length}`;
+        const proyecto = await pool.query(query, valores);
+
+        if (proyecto.rowCount === 0) {
+            return res.status(404).json({ message: 'Proyecto no encontrado' });
+        }
 
         if (imagenes && imagenes.length > 0){
             for(const imagen of imagenes) {
@@ -118,34 +129,7 @@ router.put('/:idproyecto', async (req, res) => {
             }
         }
 
-        if (!descripcion || descripcion === '') {
-            descripcion = existingProject.rows[0].descripcion;
-        }
-        if (!ciudad || ciudad === 'Ciudad') {
-            ciudad = existingProject.rows[0].ciudad;
-        }
-        if (!tipo || tipo === 'Tipo') {
-            tipo = existingProject.rows[0].tipo;
-        }
-        if (!precio || precio === '') {
-            precio = existingProject.rows[0].precio;
-        }
-        if (!nombre || nombre === '') {
-            nombre = existingProject.rows[0].nombre;
-        }
-        if (!direccion || direccion === '') {
-            direccion = existingProject.rows[0].direccion;
-        }
-        if (!estado || estado === 'activo') {
-            estado = existingProject.rows[0].estado;
-        }
-
-        const query2 = `UPDATE proyecto SET 
-        descripcion = $1, ciudad = $2, tipo = $3, precio = $4, nombre = $5, direccion = $6, estado = $7 WHERE id = $8`;
-
-        const result = await pool.query(query2, [descripcion, ciudad, tipo, precio, nombre, direccion, estado, idproyecto]);
-
-        res.status(201).json({ message: 'Proyecto actualizado con exito', users: result.rows[0] });
+        res.json(proyecto.rows);
 
     } catch(error) {
         console.log(error);
