@@ -1,10 +1,13 @@
 const router = require("express").Router();
 const pool = require('../database');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
+
 
 // Registrar usuario
 router.post('/', async (req, res) => {
-    
+
     const { user, name, password, email, phone } = req.body;
 
     try {
@@ -27,7 +30,7 @@ router.post('/', async (req, res) => {
 
     } catch (err) {
         console.error('Error al agregar al nuevo empleado:', err);
-        res.status(500).json({ err: 'Error al agregar al empleado'});
+        res.status(500).json({ err: 'Error al agregar al empleado' });
     }
 
 });
@@ -91,9 +94,117 @@ router.put('/:idusuario', async (req, res) => {
 
         res.status(201).json({ message: 'Usuario actualizado con exito', users: result.rows[0] });
 
-    } catch(error) {
+    } catch (error) {
         console.log(error);
         res.status(500).json({ error: 'Error al editar el perfil' });
+    }
+});
+
+router.post('/recuperar', async (req, res) => {
+    const { email } = req.body;
+
+    try {
+        const query = 'SELECT * FROM usuario WHERE email = $1';
+        const usuario = await pool.query(query, [email]);
+
+        if (usuario.rows.length === 0) {
+            return res.status(404).json({ message: 'Correo electrónico no encontrado' });
+        }
+
+        const resetCode = crypto.randomBytes(3).toString('hex'); // Genera un código aleatorio de 6 caracteres
+        const expirationDate = new Date();
+        expirationDate.setHours(expirationDate.getHours() + 1); // La expiración es dentro de una hora
+
+        // Actualizar el código de restablecimiento y la fecha de expiración en la base de datos
+        const updateQuery = `
+            UPDATE usuario SET reset_code = $1, reset_code_expiration = $2 WHERE email = $3
+        `;
+        await pool.query(updateQuery, [resetCode, expirationDate, email]);
+
+        // Enviar correo electrónico con el código de recuperación
+        const transporter = nodemailer.createTransport({
+            service: 'gmail', // O cualquier otro servicio de correo
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+            }
+        });
+
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: 'Recuperación de contraseña',
+            text: `Tu código de recuperación es: ${resetCode}. Este código expirará en 1 hora.`
+        };
+
+        await transporter.sendMail(mailOptions);
+
+        res.status(200).json({ message: 'Correo de recuperación enviado' });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Error al intentar recuperar la contraseña' });
+    }
+});
+
+
+// Ruta para verificar el código de recuperación
+router.post('/verify-code', async (req, res) => {
+    const { email, codigo } = req.body;
+
+    try {
+        const query = 'SELECT * FROM usuario WHERE email = $1';
+        const usuario = await pool.query(query, [email]);
+
+        if (usuario.rows.length === 0) {
+            return res.status(404).json({ message: 'Correo electrónico no encontrado' });
+        }
+
+        const user = usuario.rows[0];
+
+        // Verificar si el código de restablecimiento es válido
+        if (user.reset_code !== codigo) {
+            return res.status(400).json({ message: 'Código de recuperación inválido' });
+        }
+
+        // Verificar si el código ha expirado
+        const now = new Date();
+        if (new Date(user.reset_code_expiration) < now) {
+            return res.status(400).json({ message: 'El código ha expirado' });
+        }
+
+        res.status(200).json({ message: 'Código verificado correctamente' });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Error al verificar el código' });
+    }
+});
+
+// Ruta para restablecer la contraseña
+router.post('/reset-password', async (req, res) => {
+    const { usuario, password, correo } = req.body;
+
+    try {
+        const query = 'SELECT * FROM usuario WHERE email = $1';
+        const usuarioResult = await pool.query(query, [correo]);
+
+        if (usuarioResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Correo electrónico no encontrado' });
+        }
+
+        // Hashear la nueva contraseña antes de guardarla
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Actualizar la contraseña en la base de datos
+        const updateQuery = 'UPDATE usuario SET password = $1, reset_code = NULL, reset_code_expiration = NULL WHERE email = $2';
+        await pool.query(updateQuery, [hashedPassword, correo]);
+
+        res.status(200).json({ message: 'Contraseña actualizada correctamente' });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Error al restablecer la contraseña' });
     }
 });
 
