@@ -35,10 +35,11 @@ router.post('/', async (req, res) => {
 router.get('/', async (req, res) => {
 
     try {
-        const query = `SELECT p.* , (SELECT i.imagen_url
-                FROM imagen i WHERE i.idproyecto = p.id
-                ORDER BY i.id ASC LIMIT 1) AS imagen
-                FROM proyecto p WHERE p.estado = 'activo'`;
+        const query = `SELECT p.*, i.imagen_url
+            FROM proyecto p
+            LEFT JOIN imagen i ON i.idproyecto = p.id AND i.id = (SELECT MIN(id) FROM imagen WHERE idproyecto = p.id)
+            WHERE p.estado = 'activo';
+            `;
 
         const proyectos = await pool.query(query);
 
